@@ -1,0 +1,9 @@
+account: mail@protonmail.com
+password: v3rS3cr3t
+forwarding:
+  - address: mail@protonmail.
+    recipients:
+      - mail@gmail.com
+  - address: mail@pm.me
+    recipients:
+      - mail@gmail.com
