@@ -32,11 +32,6 @@ def is_ready(c) -> bool:
     return len(unready) == 0
 
 def list_accounts(c, readyOnly= False) -> [Account]:
-    #proc.expect('>>> ')
-    
-    # # : account              (status         , address mode   )
-    # 0 : ***REMOVED***         (connected      , combined       )
-    #
     accountsTxt = send_cmd(c, 'list')
     accounts = accountsTxt.split('\r\n')[2:-2]
 
@@ -81,8 +76,6 @@ def delete_account(proc, number):
     proc.sendline('yes')
     proc.expect('\r>>>  \x08')
 
-#[a.name for a in list_accounts(c)]
-
 class Socket(object):
     def __init__(self, address, port, username, password, security):
         self.address = address
@@ -104,11 +97,6 @@ def get_account_info(proc, number) -> (Socket, Socket):
     smtpS = Socket(smtpR.group('addr'),smtpR.group('port'),smtpR.group('user'),smtpR.group('pass'),smtpR.group('sec'))
 
     return (imapS, smtpS)
-
-#c = init_pmbridge()
-#is_ready(c)
-#
-
 
 if __name__ == '__main__':
     import yaml, eml_parser
@@ -162,18 +150,13 @@ if __name__ == '__main__':
         typ, data = M.search(None,'(UNSEEN)')
         
         for num in data[0].split():
-            typ, data = M.fetch(num,'(BODY[HEADER.FIELDS (To)] BODY[HEADER.FIELDS (Cc)] BODY[HEADER.FIELDS (Bcc)] BODY[HEADER.FIELDS (Subject)] RFC822)') # num is a byte, https://www.rfc-editor.org/rfc/rfc3501
-            
-            #print(data)
-            #to = data[1][1].decode('utf-8').strip()
-            #if len(to) > 4:
-            #    to = to[4:].split(',')
-            #cc = data[2][1].decode('utf-8').strip()
-            #if len(cc) > 4:
-            #    cc = cc[4:].split(',')
-            #bcc = data[3][1].decode('utf-8').strip() # b'\r\n'
-            #subject = data[4][1].decode('utf-8').strip() # b'Subject: Re: This is a test for the auto-forward (4)\r\n\r\n'
-            body = data[5][1]
+            # This is potentially dangerous, as fetching the body marks the message as read.
+            # Marking the message as read means that if an error is thrown, the message is not reprocessed
+            typ, data = M.fetch(num,'(RFC822)') # num is a byte, https://www.rfc-editor.org/rfc/rfc3501
+            # Re-put unseen flag
+            M.store(num,'-FLAGS','\\Seen')
+
+            body = data[0][1]
             ep = eml_parser.EmlParser()
             parsed_eml = ep.decode_email_bytes(body)
             
@@ -197,7 +180,9 @@ if __name__ == '__main__':
                     newDest.update(forwarding[d])
             newDest = list(newDest)
             if len(newDest) == 0:
-                continue # The mail has already been marked as read by the RFC field
+                M.store(num,'+FLAGS','\\Seen')
+                continue 
+            
             newDest = ', '.join([f"<{a}>" for a in newDest])
 
             old_msg = email.message_from_string(body.decode('utf-8'))
@@ -206,28 +191,23 @@ if __name__ == '__main__':
             forwarding_msg['To'] = newDest
             forwarding_msg['Subject'] = 'Fwd: ' + subject
 
-            #forwarding_msg.set_content(f'Forwarded email from {from_} :\n\n' + body.decode('utf-8').strip())
             newPayload = []
+            # TODO: We need to handle if the message is HTML or not (the line breaks are affected)
             if old_msg.is_multipart():
                 for payload in old_msg.get_payload():
                     print("Payload charset:", payload.get_charset(), payload.get_content_type())
                     break_ = "\n"
-                    #if payload.get_content_type() == 'text/html':
-                    #    break_ = '<br/><br/><br/>'
                     newPayload.append(f"Forwarded email from {from_} :{break_}{payload}")
             else:
-                #print forwarding_msg.get_payload()
                 break_ = "\n"
-                #if old_msg.get_content_type() == 'text/html':
-                #    break_ = '<br/><br/><br/>'
                 newPayload = f"Forwarded email from {from_} :{break_}{old_msg.get_payload()}"
             forwarding_msg.set_payload(newPayload)
 
             print(f"Got mail \"{subject}\" from <{from_}>; sending to {newDest}")
-            #S.send_message(forwarding_msg)
+            S.send_message(forwarding_msg)
 
-            # Set read flag
-            #typ, data = M.store(num,'+FLAGS','\\Seen')
+            # Set read flag so we don't reprocess the message
+            M.store(num,'+FLAGS','\\Seen')
         
         sleepTime = 10
         print(f"Mailbox checked. Checking again in {sleepTime}s")
