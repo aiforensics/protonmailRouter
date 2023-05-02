@@ -83,11 +83,3 @@ class SMTPClient(object):
     
     def sendMessage(self, message: email.message.Message):
         self.client.send_message(message)
-
-def getAddressesFromHeader(addresses:str) -> [str]:
-    regex = r"<?(?P<mail>[a-z0-9_+-]+@[a-z0-9_-]+\.[a-z]+)>?"
-    mails = re.findall(regex, addresses, re.MULTILINE | re.IGNORECASE)
-    for i,_ in enumerate(mails):
-        if mails[i][0] == '<':
-            mails[i] = mails[i][1:-1]
-    return mails
