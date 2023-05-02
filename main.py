@@ -8,6 +8,8 @@ if __name__ == '__main__':
         config = yaml.safe_load(stream)
     account = config['account']
     password = config['password']
+    check_interval:int = config['checkIntervalMinutes']
+    sleepTime = check_interval * 60
     incoming_to_intended = {}
     for b in config['forwarding']:
         incoming_to_intended[b['address'].lower()] = b['recipients']
@@ -30,6 +32,7 @@ if __name__ == '__main__':
     imap, smtp = bridge.get_account_info(0)
     imap = mp.IMAPClient(imap.address, imap.port, imap.security.upper() == 'STARTTLS', imap.username, imap.password)
     smtp = mp.SMTPClient(smtp.address, smtp.port, smtp.security.upper() == 'STARTTLS', smtp.username, smtp.password)
+    print("IMAP and SMTP clients initialized. Starting ProtonRouter!")
 
     while True:
         for incoming in imap.getUnreadEmailsIter():
@@ -68,6 +71,5 @@ if __name__ == '__main__':
             imap.readMail(incoming.number)
             imap.archiveMail(incoming.number)
         
-        sleepTime = 10
         print(f"Mailbox checked. Checking again in {sleepTime}s")
         time.sleep(sleepTime)
