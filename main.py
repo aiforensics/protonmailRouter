@@ -34,6 +34,15 @@ if __name__ == '__main__':
     smtp = mp.SMTPClient(smtp.address, smtp.port, smtp.security.upper() == 'STARTTLS', smtp.username, smtp.password)
     print("IMAP and SMTP clients initialized. Starting ProtonRouter!")
 
+    print("""
+______          _             ______            _            
+| ___ \        | |            | ___ \          | |           
+| |_/ / __ ___ | |_ ___  _ __ | |_/ /___  _   _| |_ ___ _ __ 
+|  __/ '__/ _ \| __/ _ \| '_ \|    // _ \| | | | __/ _ \ '__|
+| |  | | | (_) | || (_) | | | | |\ \ (_) | |_| | ||  __/ |   
+\_|  |_|  \___/ \__\___/|_| |_\_| \_\___/ \__,_|\__\___|_|   
+""")
+
     while True:
         for incoming in imap.getUnreadEmailsIter():
 
