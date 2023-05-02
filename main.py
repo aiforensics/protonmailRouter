@@ -1,114 +1,81 @@
+import protonbridge as pb
+import mail_protocols as mp
+import yaml, email, time
 
 if __name__ == '__main__':
-    import yaml, eml_parser
     config = None
     with open("config.yaml", "r") as stream:
         config = yaml.safe_load(stream)
-
     account = config['account']
     password = config['password']
-    forwarding = {}
+    incoming_to_intended = {}
     for b in config['forwarding']:
-        forwarding[b['address'].lower()] = b['recipients']
+        incoming_to_intended[b['address'].lower()] = b['recipients']
     print("Config file parsed")
 
-    pb = init_pmbridge()
+    bridge = pb.ProtonmailBridge()
     print("Proton bridge started")
     ready = False
-
-    import os 
-
     while not ready:
-        ready = is_ready(pb)
-
-        accounts = list_accounts(pb)
+        ready = bridge.is_ready()
+        accounts = bridge.list_accounts()
         if len(accounts) < 1:
             print("No accounts found. Adding account")
-            add_account(pb, account, password)
+            bridge.add_account(account, password)
             print(f"Added account {account}")
             ready = False
         time.sleep(2)
-    
     print("Proton bridge initialized")
 
-    imap, smtp = get_account_info(pb, 0)
+    imap, smtp = bridge.get_account_info(0)
+    imap = mp.IMAPClient(imap.address, imap.port, imap.security.upper() == 'STARTTLS', imap.username, imap.password)
+    smtp = mp.SMTPClient(smtp.address, smtp.port, smtp.security.upper() == 'STARTTLS', smtp.username, smtp.password)
 
-    from imaplib import IMAP4
-    from smtplib import SMTP
-    import email
-
-    M = IMAP4("127.0.0.1", int(imap.port))
-    M.login(imap.username, imap.password) # ('OK', [b'[CAPABILITY IDLE IMAP4rev1 MOVE STARTTLS UIDPLUS UNSELECT] Logged in'])
-
-    S = SMTP("127.0.0.1", int(smtp.port))
-    S.ehlo()
-    S.starttls()
-    S.login(smtp.username, smtp.password) # (235, b'2.0.0 Authentication succeeded')
-
-    print('Login successful. Opening mailbox and starting loop...')
-    M.select('Inbox')
     while True:
-        typ, data = M.search(None,'(UNSEEN)')
-        
-        for num in data[0].split():
-            # This is potentially dangerous, as fetching the body marks the message as read.
-            # Marking the message as read means that if an error is thrown, the message is not reprocessed
-            typ, data = M.fetch(num,'(RFC822)') # num is a byte, https://www.rfc-editor.org/rfc/rfc3501
-            # Re-put unseen flag
-            M.store(num,'-FLAGS','\\Seen')
+        for incoming in imap.getUnreadEmailsIter():
 
-            body = data[0][1]
-            ep = eml_parser.EmlParser()
-            parsed_eml = ep.decode_email_bytes(body)
-            
-            from_ = subject = ""
-            to = cc = []
-            if 'from' in parsed_eml['header']:
-                from_ = parsed_eml['header']['from']
-            if 'subject' in parsed_eml['header']:
-                subject = parsed_eml['header']['subject']
-            if 'to' in parsed_eml['header']:
-                to = parsed_eml['header']['to']
-            if 'cc' in parsed_eml['header']:
-                cc = parsed_eml['header']['cc']
+            incoming_sender = mp.getAddressesFromHeader(incoming['From'])[0]
+            incoming_subject = incoming['Subject']
+            incoming_to = mp.getAddressesFromHeader(incoming['To'])
+            incoming_cc = mp.getAddressesFromHeader(incoming['Cc'])
 
-            dest = set(to)
-            dest.update(cc)
-
-            newDest = set()
-            for d in dest:
-                if d in forwarding:
-                    newDest.update(forwarding[d])
-            newDest = list(newDest)
-            if len(newDest) == 0:
-                M.store(num,'+FLAGS','\\Seen')
+            incoming_recipients = set(incoming_to)
+            incoming_recipients.update(incoming_cc)
+            outgoing_recipients = set()
+            outgoing_from = ""
+            for mail_recipient in incoming_recipients:
+                if mail_recipient in incoming_to_intended:
+                    outgoing_recipients.update(incoming_to_intended[mail_recipient])
+                    outgoing_from = mail_recipient
+            outgoing_recipients = list(outgoing_recipients)
+            if len(outgoing_recipients) == 0:
+                imap.readMail(incoming.number)
                 continue 
             
-            newDest = ', '.join([f"<{a}>" for a in newDest])
+            outgoing = email.message.Message()
+            outgoing['From'] = outgoing_from
+            outgoing['To'] = ', '.join([f"<{a}>" for a in outgoing_recipients])
+            outgoing['Subject'] = incoming_sender + ': ' + incoming_subject
+            outgoing['Reply-To'] = incoming_sender
+            #outgoing['Return-Path'] = 'mailadmin@mail.com' # Define the return path address in the settings
 
-            old_msg = email.message_from_string(body.decode('utf-8'))
-            forwarding_msg = email.message.Message()
-            forwarding_msg['From'] = smtp.username
-            forwarding_msg['To'] = newDest
-            forwarding_msg['Subject'] = 'Fwd: ' + subject
-
-            newPayload = []
-            # TODO: We need to handle if the message is HTML or not (the line breaks are affected)
-            if old_msg.is_multipart():
-                for payload in old_msg.get_payload():
+            outgoing_payload = []
+            # TODO: We need to handle if the message is HTML (by checking the Content-Type. Try looking in the headers) or not (the line breaks are affected)
+            #print("Conent type:", incoming['Content-Type']) # text/plain; charset=utf-8
+            if incoming.is_multipart():
+                for payload in incoming.get_payload():
                     print("Payload charset:", payload.get_charset(), payload.get_content_type())
-                    break_ = "\n"
-                    newPayload.append(f"Forwarded email from {from_} :{break_}{payload}")
+                    line_break = "\n"
+                    outgoing_payload.append(f"Forwarded email from {incoming_sender} :{line_break}{payload}")
             else:
-                break_ = "\n"
-                newPayload = f"Forwarded email from {from_} :{break_}{old_msg.get_payload()}"
-            forwarding_msg.set_payload(newPayload)
+                line_break = "\n"
+                outgoing_payload = f"Forwarded email from {incoming_sender} :{line_break}{incoming.get_payload()}"
+            outgoing.set_payload(outgoing_payload)
 
-            print(f"Got mail \"{subject}\" from <{from_}>; sending to {newDest}")
-            S.send_message(forwarding_msg)
-
+            print(f"Got mail \"{incoming_subject}\" from {incoming_sender}; sending to {outgoing_recipients}")
+            smtp.sendMessage(outgoing)
             # Set read flag so we don't reprocess the message
-            M.store(num,'+FLAGS','\\Seen')
+            imap.readMail(incoming.number)
         
         sleepTime = 10
         print(f"Mailbox checked. Checking again in {sleepTime}s")
