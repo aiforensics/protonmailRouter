@@ -62,10 +62,11 @@ if __name__ == '__main__':
             outgoing.add_header('X-Original-To', ", ".join(outgoing_recipients))
             outgoing.add_header('Delivered-To', ", ".join(outgoing_recipients))
 
-            print(f"Got mail \"{incoming_subject}\" from {incoming_sender}; sending to {outgoing_recipients}")
+            print(f"Got mail \"{incoming_subject}\" from {incoming_sender[0]} ({incoming_sender[1]}); sending to {outgoing_recipients}")
             smtp.sendMessage(outgoing)
             # Set read flag so we don't reprocess the message
             imap.readMail(incoming.number)
+            imap.archiveMail(incoming.number)
         
         sleepTime = 10
         print(f"Mailbox checked. Checking again in {sleepTime}s")

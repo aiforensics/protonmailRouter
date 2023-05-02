@@ -72,6 +72,21 @@ class IMAPClient(object):
     def removeMailFlag(self, mailNumber:str, flags:str):
         return self.client.store(mailNumber, '-FLAGS', flags)
 
+    def archiveMail(self, mailNumber:str):
+        return self.moveMailToFolder(mailNumber, 'Archive')
+
+    def moveMailToFolder(self, mailNumber:str, folder:str):
+        # [MOVE](https://www.rfc-editor.org/rfc/rfc6851) is not supported by the lib, apparently :c 
+        if folder.lower() == 'archive':
+            # Shortcut to avoid settings the flag in the result. May want to apply the flag in the result in the future...
+            self.addMailFlag(mailNumber, '(\\Archive)')
+        result = self.client.copy(mailNumber, folder)
+        if result[0] == 'OK':
+            # If the copy was successful, mark the original message as deleted
+            self.addMailFlag(mailNumber, '(\\Deleted)')
+            self.client.expunge()
+        else:
+            print("Error encountered moving mail to folder ", folder)
 
 class SMTPClient(object):
     def __init__(self, host:str, port:int, start_tsl:bool, username:str, password:str):
