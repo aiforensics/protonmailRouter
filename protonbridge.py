@@ -90,11 +90,11 @@ class ProtonmailBridge(object):
         output = output[output.find("Configuration for"):].split('\r\n\r\n')
         imapSettingsStr = output[0]
         smtpSettingsStr = output[1]
-        reg = r"Address:[ ]+(?P<addr>[0-9.:]+).*port:[ ](?P<port>\d+).*Username:[ ]+(?P<user>[a-zA-Z0-9.@_-]+).*Password:[ ]+(?P<pass>[a-zA-Z0-9]+)\r\nSecurity:[ ]+(?P<sec>[A-Z]+)"
-        imapR = re.search(reg, imapSettingsStr, re.MULTILINE|re.DOTALL)
+        reg = r"Address:\s*(?P<addr>[0-9.:]+)\r\n.*port:\s*(?P<port>\d+)\r\nUsername:\s*(?P<user>.+)\r\nPassword:\s*(?P<pass>.+)\r\nSecurity:\s*(?P<sec>[A-Z]+)"
+        imapR = re.search(reg, imapSettingsStr, re.MULTILINE|re.IGNORECASE)
         imapS = Socket(imapR.group('addr'),imapR.group('port'),imapR.group('user'),imapR.group('pass'),imapR.group('sec'))
 
-        smtpR = re.search(reg, smtpSettingsStr, re.MULTILINE|re.DOTALL)
+        smtpR = re.search(reg, smtpSettingsStr, re.MULTILINE|re.IGNORECASE)
         smtpS = Socket(smtpR.group('addr'),smtpR.group('port'),smtpR.group('user'),smtpR.group('pass'),smtpR.group('sec'))
 
         return (imapS, smtpS)
