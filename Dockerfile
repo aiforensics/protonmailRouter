@@ -10,4 +10,6 @@ USER aifuser
 WORKDIR /app
 COPY . .
 RUN pip install -r requirements.txt --user
-CMD python3 main.py
+CMD python3 -u main.py
+
+LABEL org.opencontainers.image.source = "https://github.com/aiforensics/protonmailRouter"
