@@ -65,9 +65,15 @@ ______          _             ______            _
                 if recipient_email in incoming_to_intended:
                     outgoing_recipients.update(incoming_to_intended[recipient_email])
                     outgoing_from = recipient_email
-            outgoing_recipients.remove(incoming_sender[1]) # Remove the sender from the set, just in case, to avoid sending a CC to the same person again
+            try:
+                outgoing_recipients.remove(incoming_sender[1]) # Remove the sender from the set, just in case, to avoid sending a CC to the same person again
+            except Exception:
+                pass
             for addr in incoming_to_intended.keys():
-                outgoing_recipients.remove(addr) # Removes from the set all the aliases, to avoid a loop
+                try:
+                    outgoing_recipients.remove(addr) # Removes from the set all the aliases, to avoid a loop
+                except Exception:
+                    pass
             outgoing_recipients = list(outgoing_recipients)
             if len(outgoing_recipients) == 0:
                 imap.readMail(incoming.number)
