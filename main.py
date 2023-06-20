@@ -71,8 +71,9 @@ ______          _             ______            _
             #outgoing['From'] =  # outgoing_from # smtplib.SMTPDataError: (554, b'5.0.0 Error: transaction failed, blame it on the weather: invalid return path')
             outgoing.replace_header("From", account)
             outgoing.replace_header("To", ", ".join(outgoing_recipients))
-            outgoing.add_header('X-Original-To', ", ".join(outgoing_recipients))
-            outgoing.add_header('Delivered-To', ", ".join(outgoing_recipients))
+            outgoing.replace_header("Subject", f"{incoming_sender} -> {incoming_tos[0]} : {incoming_subject}")
+            outgoing.add_header('X-Original-To', incoming_sender)
+            outgoing.add_header('Delivered-To', incoming_sender)
 
             print(f"Got mail \"{incoming_subject}\" from {incoming_sender[0]} ({incoming_sender[1]}); sending to {outgoing_recipients}")
             smtp.sendMessage(outgoing)
@@ -80,5 +81,4 @@ ______          _             ______            _
             imap.readMail(incoming.number)
             imap.archiveMail(incoming.number)
         
-        print(f"Mailbox checked. Checking again in {sleepTime}s")
         time.sleep(sleepTime)
