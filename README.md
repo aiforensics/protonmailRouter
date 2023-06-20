@@ -43,7 +43,7 @@ This program have some requirements:
 version: "3"
 services:
   pmr:
-    image: ghcr.io/aiforensics/protonmailrouter:0.0.1
+    image: ghcr.io/aiforensics/protonmailrouter:0.0.3
     container_name: protonmail_router
     volumes:
       - ./config.yaml:/app/config.yaml
@@ -89,7 +89,7 @@ python3 main.py
 `DOCKER_BUILDKIT=1 docker build . -t protonmailrouter`  
 (If you don't have buildkit, remove the `--mount` parameter from the `RUN` step in the Dockerfile)
 ## TODOs
-
+- Find a way to implement a "forged" `From` using the `Sender` header and use the `Reply-To` header ([RFC4021](https://www.rfc-editor.org/rfc/rfc4021#page-7))
 - Implement Prometheus exporter
 - Config file provided as a flag
 - Credentials passed as env variables (should be really easy)
