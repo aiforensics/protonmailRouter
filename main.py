@@ -84,6 +84,7 @@ ______          _             ______            _
             # Set the `Sender` to avoid key errors with the rep
             #outgoing['Sender'] = ""
             #outgoing.replace_header("Sender", incoming_sender[1])
+            [outgoing.__delitem__(header) for header in ["Sender"]]
             outgoing.replace_header("From", account)
             outgoing.replace_header("To", ", ".join(outgoing_recipients))
             outgoing.replace_header("Subject", f"{incoming_sender} -> {incoming_tos[0][1]}: {incoming_subject}")
