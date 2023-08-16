@@ -8,7 +8,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     rm proton_bridge.deb
 USER aifuser
 WORKDIR /app
-COPY . .
+COPY ./src .
 RUN pip install -r requirements.txt --user --break-system-packages
 CMD python3 -u main.py
 
