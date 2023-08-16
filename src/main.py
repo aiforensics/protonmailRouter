@@ -38,7 +38,7 @@ def routeEmail(ctx:context, incoming_email_message: Message):
     outgoing.replace_header("To", ", ".join(recipients))
     outgoing.replace_header("Subject", f"{incoming.sender} -> {destination_distribution_list}: {incoming.subject}")
 
-    print(f"Got mail \"{incoming.sender}\" from \"{incoming.sender[0]}\" ({incoming.sender[1]}); sending to {recipients}")
+    print(f"Got mail \"{incoming.subject}\" from \"{incoming.sender[0]}\" ({incoming.sender[1]}); sending to {recipients}")
 
     # Forward the message
     ctx.smtp.sendMessage(outgoing)
