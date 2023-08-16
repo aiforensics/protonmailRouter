@@ -2,7 +2,7 @@ account: mail@protonmail.com
 password: v3rS3cr3t
 checkIntervalMinutes: 5
 forwarding:
-  - address: mail@protonmail.
+  - address: mail@protonmail.com
     recipients:
       - mail@gmail.com
   - address: mail@pm.me
