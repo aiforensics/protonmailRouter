@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 continue
             
             outgoing = incoming
-            [outgoing.__delitem__(header) for header in ["Sender"]]
+            [outgoing.__delitem__(header) for header in ["Sender", "Cc"]]
             outgoing.replace_header("From", config.account)
             outgoing.replace_header("To", ", ".join(outgoing_recipients))
             outgoing.replace_header("Subject", f"{incoming_sender} -> {incoming_tos[0][1]}: {incoming_subject}")
