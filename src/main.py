@@ -57,11 +57,6 @@ def getRecipients(message:ParsedMessage, distribution_list: dict) -> List[str]:
     for recipient_name, recipient_email in message.all_recipients:
         if recipient_email in config.distribution_list:
             recipients.update(config.distribution_list[recipient_email])
-    
-    # try:
-    #     recipients.remove(sender[1]) # Remove the sender from the set, just in case, to avoid sending a CC to the same person again
-    # except Exception:
-    #     pass 
 
     for addr in distribution_list.keys():
         try:
@@ -78,7 +73,6 @@ This will be the account/alias the the mail will be re-forwarded from
 For our usecase it's reasonable to think that only one distribution list at the time will receive messages
 """
 def getMailingList(message: ParsedMessage, distribution_list: dict) -> str:
-    # return message.tos[0][1]
     for (name, addr) in message.all_recipients:
         if addr in distribution_list:
             return addr
