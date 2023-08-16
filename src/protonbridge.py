@@ -1,4 +1,4 @@
-import pexpect, os, re
+import pexpect, os, re, time
 
 class Account(object):
     def __init__(self, id: int, name:str, status:str ):
@@ -98,3 +98,19 @@ class ProtonmailBridge(object):
         smtpS = Socket(smtpR.group('addr'),smtpR.group('port'),smtpR.group('user'),smtpR.group('pass'),smtpR.group('sec'))
 
         return (imapS, smtpS)
+
+    def login_and_boostrap(self, account_username:str, account_password:str):
+        ready = False
+        while not ready:
+            ready = self.is_ready()
+            accounts = self.list_accounts()
+
+            # We want to login if the account is signed out
+            # This means we want to log-in again if the account is reported as "signed out"
+            non_signed_out_accounts = list(filter(lambda acc: acc.status != "signed out", accounts))
+            if len(non_signed_out_accounts) < 1:
+                self.add_account(account_username, account_password)
+                # Since we just added the account, we just force the ready flag to false
+                ready = False
+            time.sleep(2)
+        return

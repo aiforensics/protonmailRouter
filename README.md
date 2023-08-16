@@ -43,7 +43,7 @@ This program have some requirements:
 version: "3"
 services:
   pmr:
-    image: ghcr.io/aiforensics/protonmailrouter:0.0.3
+    image: ghcr.io/aiforensics/protonmailrouter:0.0.5
     container_name: protonmail_router
     volumes:
       - ./config.yaml:/app/config.yaml
@@ -82,20 +82,19 @@ virtualenv venv
 pip install -r requirements.txt
 
 # Fill your config.yaml file with the credentials and the routing stuff you want
-python3 main.py
+python3 src/main.py
 ```
 
 ### Building the image
-`DOCKER_BUILDKIT=1 docker build . -t protonmailrouter`  
+`DOCKER_BUILDKIT=1 docker build . -t protonmailrouter --platform linux/amd64`  
 (If you don't have buildkit, remove the `--mount` parameter from the `RUN` step in the Dockerfile)
 ## TODOs
 - Find a way to implement a "forged" `From` using the `Sender` header and use the `Reply-To` header ([RFC4021](https://www.rfc-editor.org/rfc/rfc4021#page-7)) (looks like this [might not be possible](https://github.com/ProtonMail/proton-bridge/blob/master/pkg/message/parser.go#L445-L538))
-- Implement Prometheus exporter
+- Prometheus exporter
 - Config file provided as a flag
 - Credentials passed as env variables (should be really easy)
 - Delete received message after forwarding (as a parameter)
 - Use fuzzer or something to test the solidity of the solution
-- Transform the TODOs in GitHub issues
-- Check if it's possible to "forge" the `From` header to the original sender's mail
+- Transform those TODOs in GitHub issues
 - GitHub Action pipeline for automatic docker releases on tag
 - Try alpine docker image (the debian is 800MB+ large!)

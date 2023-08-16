@@ -1,78 +1,108 @@
 import protonbridge as pb
 import mail_protocols as mp
 import config as cfg
-import email, time
+import time
+from email.message import Message
+from email.utils import getaddresses
+from dataclasses import dataclass
+from parsed_message import ParsedMessage
+from typing import List
+
+@dataclass
+class context:
+    imap: mp.SMTPClient
+    smtp: mp.IMAPClient
+    distribution_list: dict
+
+"""
+routeEmail takes in a context (imap and smtp clients, distribution list) and a mail message.
+It elaborates the message, forwarding it to the proper distribution list, and then proceeds to read the message and forward it
+"""
+def routeEmail(ctx:context, incoming_email_message: Message):
+    incoming = ParsedMessage(incoming_email_message)
+    destination_distribution_list = getMailingList(incoming, ctx.distribution_list)
+    recipients = getRecipients(incoming, ctx.distribution_list)
+    
+    # Somehow we don't have recipients, drop the message
+    if len(recipients) == 0:
+        # We drop the message by reading it: the following loop cycle will ignore it.
+        ctx.imap.readMail(incoming_email_message.number)
+        return
+    
+    outgoing = incoming_email_message
+    # Remove from the original message all the header that might cause issues
+    [outgoing.__delitem__(header) for header in ["Sender", "Cc"]]
+    
+    # Set the new headers to forward the message to the addresses in the distribution list
+    outgoing.replace_header("From", destination_distribution_list)
+    outgoing.replace_header("To", ", ".join(recipients))
+    outgoing.replace_header("Subject", f"{incoming.sender} -> {destination_distribution_list}: {incoming.subject}")
+
+    print(f"Got mail \"{incoming.sender}\" from \"{incoming.sender[0]}\" ({incoming.sender[1]}); sending to {recipients}")
+
+    # Forward the message
+    ctx.smtp.sendMessage(outgoing)
+
+    # Set read flag so we don't reprocess the message
+    ctx.imap.readMail(incoming_email_message.number)
+    # Archive the mail to have a clean & neat inbox
+    ctx.imap.archiveMail(incoming_email_message.number)
+
+"""
+getRecipients returns a list of all the recipients in the message
+It also removes any message recipients that also happen to be in the distribution list 
+"""
+def getRecipients(message:ParsedMessage, distribution_list: dict) -> List[str]:
+    recipients = set()
+    for recipient_name, recipient_email in message.all_recipients:
+        if recipient_email in config.distribution_list:
+            recipients.update(config.distribution_list[recipient_email])
+    
+    # try:
+    #     recipients.remove(sender[1]) # Remove the sender from the set, just in case, to avoid sending a CC to the same person again
+    # except Exception:
+    #     pass 
+
+    for addr in distribution_list.keys():
+        try:
+            recipients.remove(addr) # Removes from the set all the aliases, to avoid a loop
+        except Exception:
+            pass
+    recipients = list(recipients)
+    return recipients
+
+
+"""
+getMailingList returns the mail address of the first distribution list it finds in the recipients.
+This will be the account/alias the the mail will be re-forwarded from
+For our usecase it's reasonable to think that only one distribution list at the time will receive messages
+"""
+def getMailingList(message: ParsedMessage, distribution_list: dict) -> str:
+    # return message.tos[0][1]
+    for (name, addr) in message.all_recipients:
+        if addr in distribution_list:
+            return addr
+    raise ValueError('Unable to find a distribution list in the provided message and distribution list', message.all_recipients)
+
 
 if __name__ == '__main__':
     config = cfg.Config()
     print("Config file parsed")
 
     bridge = pb.ProtonmailBridge()
-    print("Proton bridge started")
-    ready = False
-    while not ready:
-        ready = bridge.is_ready()
-        accounts = bridge.list_accounts()
-        # We want to login if the account is signed out 
-        non_signed_out_accounts = list(filter(lambda a: a.status != "signed out" ,accounts))
-        if len(non_signed_out_accounts) < 1:
-            print("No accounts found. Adding account")
-            bridge.add_account(config.account, config.password)
-            print(f"Added account {config.account}")
-            ready = False
-        time.sleep(2)
-    print("Proton bridge initialized")
+    print("Proton bridge process started")
+    bridge.login_and_boostrap(config.account, config.password)
+    print("Proton bridge operative")
 
     imap, smtp = bridge.get_account_info(0)
     imap = mp.IMAPClient(imap.address, imap.port, imap.security.upper() == 'STARTTLS', imap.username, imap.password)
     smtp = mp.SMTPClient(smtp.address, smtp.port, smtp.security.upper() == 'STARTTLS', smtp.username, smtp.password)
     print("IMAP and SMTP clients initialized. Starting ProtonRouter!")
-
+    ctx = context(imap, smtp, config.distribution_list)
 
     while True:
-        for incoming in imap.getUnreadEmailsIter():
-
-            incoming_sender = email.utils.getaddresses(incoming.get_all('from', []))[0]
-            incoming_subject = incoming['Subject']
-
-            incoming_tos = incoming.get_all('to', [])
-            incoming_ccs = incoming.get_all('cc', [])
-            incoming_resent_tos = incoming.get_all('resent-to', [])
-            incoming_resent_ccs = incoming.get_all('resent-cc', [])
-            incoming_recipients = email.utils.getaddresses(incoming_tos + incoming_ccs + incoming_resent_tos + incoming_resent_ccs)
-
-            incoming_tos = email.utils.getaddresses(incoming_tos)
-
-            outgoing_recipients = set()
-            outgoing_from = ""
-            for recipient_name, recipient_email in incoming_recipients:
-                if recipient_email in config.distribution_list:
-                    outgoing_recipients.update(config.distribution_list[recipient_email])
-                    outgoing_from = recipient_email
-            try:
-                outgoing_recipients.remove(incoming_sender[1]) # Remove the sender from the set, just in case, to avoid sending a CC to the same person again
-            except Exception:
-                pass
-            for addr in config.distribution_list.keys():
-                try:
-                    outgoing_recipients.remove(addr) # Removes from the set all the aliases, to avoid a loop
-                except Exception:
-                    pass
-            outgoing_recipients = list(outgoing_recipients)
-            if len(outgoing_recipients) == 0:
-                imap.readMail(incoming.number)
-                continue
-            
-            outgoing = incoming
-            [outgoing.__delitem__(header) for header in ["Sender", "Cc"]]
-            outgoing.replace_header("From", config.account)
-            outgoing.replace_header("To", ", ".join(outgoing_recipients))
-            outgoing.replace_header("Subject", f"{incoming_sender} -> {incoming_tos[0][1]}: {incoming_subject}")
-
-            print(f"Got mail \"{incoming_subject}\" from \"{incoming_sender[0]}\" ({incoming_sender[1]}); sending to {outgoing_recipients}")
-            smtp.sendMessage(outgoing)
-            # Set read flag so we don't reprocess the message
-            imap.readMail(incoming.number)
-            imap.archiveMail(incoming.number)
-        
+        # We keep track of the read addresses by filtering the unread ones
+        # The mailbox is supposed to be unattended, so all the non-matching messages will remain in the inbox folder
+        for mail in imap.getUnreadEmailsIter():
+            routeEmail(ctx, mail)
         time.sleep(config.sleepTime)

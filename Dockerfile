@@ -9,6 +9,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
 USER aifuser
 WORKDIR /app
 COPY ./src .
+COPY ./requirements.txt .
 RUN pip install -r requirements.txt --user --break-system-packages
 CMD python3 -u main.py
 
