@@ -1,20 +1,20 @@
 import pexpect, os, re, time
+from dataclasses import dataclass
+from typing import List
 
+@dataclass
 class Account(object):
-    def __init__(self, id: int, name:str, status:str ):
-        self.id = id
-        self.name = name
-        self.status = status # "locked", "connected", "signed out"
-        self.smtp = None
-        self.imap = None
+    id:int
+    name:str
+    status:str # "locked", "connected", "signed out"
 
+@dataclass
 class Socket(object):
-    def __init__(self, address, port, username, password, security):
-        self.address = address
-        self.port = port
-        self.username = username
-        self.password = password
-        self.security = security
+    address:str
+    port:str
+    username:str
+    password:str
+    security:str
 
 class ProtonmailBridge(object):
     def __init__(self, additional_flags='') -> pexpect.pty_spawn.spawn:
@@ -36,7 +36,7 @@ class ProtonmailBridge(object):
         unready = [a for a in accs if a.status != 'connected']
         return len(unready) == 0
 
-    def list_accounts(self, readyOnly= False) -> [Account]:
+    def list_accounts(self, readyOnly= False) -> List[Account]:
         accountsTxt = self.send_cmd('list')
         accounts = accountsTxt.split('\r\n')[2:-2]
 
@@ -50,9 +50,9 @@ class ProtonmailBridge(object):
             accAddrMode = r.group('addr_mode')
             if readyOnly:
                 if accStatus == "connected":
-                    accs.append(Account(int(accNumber), accName, accStatus))
+                    accs.append(Account(id=int(accNumber), name=accName, status=accStatus))
             else:
-                accs.append(Account(int(accNumber), accName, accStatus))
+                accs.append(Account(id=int(accNumber), name=accName, status=accStatus))
         return accs
 
     def add_account(self, user:str, pwd:str):
