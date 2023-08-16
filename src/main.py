@@ -1,18 +1,10 @@
 import protonbridge as pb
 import mail_protocols as mp
-import yaml, email, time
+import config as cfg
+import email, time
 
 if __name__ == '__main__':
-    config = None
-    with open("config.yaml", "r") as stream:
-        config = yaml.safe_load(stream)
-    account = config['account']
-    password = config['password']
-    check_interval:int = config['checkIntervalMinutes']
-    sleepTime = check_interval * 60
-    incoming_to_intended = {}
-    for b in config['forwarding']:
-        incoming_to_intended[b['address'].lower()] = b['recipients']
+    config = cfg.Config()
     print("Config file parsed")
 
     bridge = pb.ProtonmailBridge()
@@ -25,8 +17,8 @@ if __name__ == '__main__':
         non_signed_out_accounts = list(filter(lambda a: a.status != "signed out" ,accounts))
         if len(non_signed_out_accounts) < 1:
             print("No accounts found. Adding account")
-            bridge.add_account(account, password)
-            print(f"Added account {account}")
+            bridge.add_account(config.account, config.password)
+            print(f"Added account {config.account}")
             ready = False
         time.sleep(2)
     print("Proton bridge initialized")
@@ -54,14 +46,14 @@ if __name__ == '__main__':
             outgoing_recipients = set()
             outgoing_from = ""
             for recipient_name, recipient_email in incoming_recipients:
-                if recipient_email in incoming_to_intended:
-                    outgoing_recipients.update(incoming_to_intended[recipient_email])
+                if recipient_email in config.distribution_list:
+                    outgoing_recipients.update(config.distribution_list[recipient_email])
                     outgoing_from = recipient_email
             try:
                 outgoing_recipients.remove(incoming_sender[1]) # Remove the sender from the set, just in case, to avoid sending a CC to the same person again
             except Exception:
                 pass
-            for addr in incoming_to_intended.keys():
+            for addr in config.distribution_list.keys():
                 try:
                     outgoing_recipients.remove(addr) # Removes from the set all the aliases, to avoid a loop
                 except Exception:
@@ -71,16 +63,11 @@ if __name__ == '__main__':
                 imap.readMail(incoming.number)
                 continue
             
-            #outgoing = email.message.Message()
             outgoing = incoming
-            # Set the `Sender` to avoid key errors with the rep
-            #outgoing['Sender'] = ""
-            #outgoing.replace_header("Sender", incoming_sender[1])
             [outgoing.__delitem__(header) for header in ["Sender"]]
-            outgoing.replace_header("From", account)
+            outgoing.replace_header("From", config.account)
             outgoing.replace_header("To", ", ".join(outgoing_recipients))
             outgoing.replace_header("Subject", f"{incoming_sender} -> {incoming_tos[0][1]}: {incoming_subject}")
-            #outgoing.add_header('Reply-To', incoming_sender[1])
 
             print(f"Got mail \"{incoming_subject}\" from \"{incoming_sender[0]}\" ({incoming_sender[1]}); sending to {outgoing_recipients}")
             smtp.sendMessage(outgoing)
@@ -88,4 +75,4 @@ if __name__ == '__main__':
             imap.readMail(incoming.number)
             imap.archiveMail(incoming.number)
         
-        time.sleep(sleepTime)
+        time.sleep(config.sleepTime)
