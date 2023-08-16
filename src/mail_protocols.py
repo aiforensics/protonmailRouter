@@ -1,7 +1,10 @@
 
 from imaplib import IMAP4
 from smtplib import SMTP
-import email, re
+from email.message import Message
+from collections.abc import Generator
+from typing import List
+import email
 
 class IMAPClient(object):
     def __init__(self, host:str, port:int, start_tsl:bool, username:str, password:str, default_folder:str='Inbox'):
@@ -13,20 +16,20 @@ class IMAPClient(object):
         self.client.select(default_folder)
         self.default_folder = default_folder
     
-    def changeFolder(self, folder:str = 'Inbox'):
+    def changeFolder(self, folder:str = 'Inbox') -> None:
         self.client.select(folder)
 
-    def getUnreadEmails(self) -> [email.message.Message]:
-        return [m for m in getUnreadEmailsIter()]
+    def getUnreadEmails(self) -> [Message]:
+        return [m for m in self.getUnreadEmailsIter()]  
     
-    def getUnreadEmailsIter(self) -> email.message.Message:
+    def getUnreadEmailsIter(self) -> Generator[Message, None, None]:
         for mail in self.getEmailsIter('(UNSEEN)'):
             yield mail
 
-    def getEmails(self, filter:str='()') -> [email.message.Message]:
-        return [m for m in getEmailsIter(filter)]
+    def getEmails(self, filter:str='()') -> List[Message]:
+        return [m for m in self.getEmailsIter(filter)]
 
-    def getEmailsIter(self, filter:str='()') -> email.message.Message:
+    def getEmailsIter(self, filter:str='()') -> Generator[Message, None, None]:
         res, data = self.client.search(None,filter)
         if res != 'OK':
             return
