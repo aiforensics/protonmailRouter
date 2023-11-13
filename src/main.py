@@ -20,7 +20,12 @@ It elaborates the message, forwarding it to the proper distribution list, and th
 """
 def routeEmail(ctx:context, incoming_email_message: Message):
     incoming = ParsedMessage(incoming_email_message)
-    destination_distribution_list = getMailingList(incoming, ctx.distribution_list)
+    try:
+        destination_distribution_list = getMailingList(incoming, ctx.distribution_list)
+    except:
+        print(f"Got mail from ${incoming.sender} directed to ${incoming.all_recipients} and couldn't find a proper list. Skipping.")
+        ctx.imap.readMail(incoming_email_message.number)
+        return
     recipients = getRecipients(incoming, ctx.distribution_list)
     
     # Somehow we don't have recipients, drop the message
