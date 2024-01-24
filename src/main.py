@@ -79,8 +79,9 @@ For our usecase it's reasonable to think that only one distribution list at the 
 """
 def getMailingList(message: ParsedMessage, distribution_list: dict) -> str:
     for (name, addr) in message.all_recipients:
-        if addr in distribution_list:
-            return addr
+        dest_address = addr.lower()
+        if dest_address in distribution_list:
+            return dest_address
     raise ValueError('Unable to find a distribution list in the provided message and distribution list', message.all_recipients)
 
 
