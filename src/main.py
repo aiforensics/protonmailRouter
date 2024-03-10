@@ -54,12 +54,13 @@ def routeEmail(ctx:context, incoming_email_message: Message):
     ctx.imap.archiveMail(incoming_email_message.number)
 
 """
-getRecipients returns a list of all the recipients in the message
+getRecipients returns a list of all the recipients in the message (to, cc, bcc)
 It also removes any message recipients that also happen to be in the distribution list 
 """
 def getRecipients(message:ParsedMessage, distribution_list: dict) -> List[str]:
     recipients = set()
     for recipient_name, recipient_email in message.all_recipients:
+        recipient_email = recipient_email.strip().lower()
         if recipient_email in config.distribution_list:
             recipients.update(config.distribution_list[recipient_email])
 
@@ -79,7 +80,7 @@ For our usecase it's reasonable to think that only one distribution list at the 
 """
 def getMailingList(message: ParsedMessage, distribution_list: dict) -> str:
     for (name, addr) in message.all_recipients:
-        dest_address = addr.lower()
+        dest_address = addr.strip().lower()
         if dest_address in distribution_list:
             return dest_address
     raise ValueError('Unable to find a distribution list in the provided message and distribution list', message.all_recipients)
