@@ -14,4 +14,5 @@ class ParsedMessage:
 
         self.all_recipients = getaddresses(self.tos + self.ccs + self.resent_tos + self.resent_ccs)
 
+        self.original = mail
         # self.tos = getaddresses(tos)
