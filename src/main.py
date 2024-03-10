@@ -26,7 +26,8 @@ def routeEmail(ctx:context, incoming_email_message: Message):
         print(f"Got mail from ${incoming.sender} directed to ${incoming.all_recipients} and couldn't find a proper list. Skipping.")
         ctx.imap.readMail(incoming_email_message.number)
         return
-    recipients = getRecipients(incoming, ctx.distribution_list)
+    # recipients = getRecipients(incoming, ctx.distribution_list)
+    recipients = ctx.distribution_list[destination_distribution_list]
     
     # Somehow we don't have recipients, drop the message
     if len(recipients) == 0:
@@ -40,7 +41,15 @@ def routeEmail(ctx:context, incoming_email_message: Message):
     
     # Set the new headers to forward the message to the addresses in the distribution list
     outgoing.replace_header("From", destination_distribution_list)
-    outgoing.replace_header("To", ", ".join(recipients))
+
+    if incoming_email_message.get_all("To") is None:
+        # If we got here, we (probably) are in the infamous "Undisclosed Recipients" case
+
+        # set_raw is probably incorrect here, but idk what else to use
+        outgoing.set_raw("To", ", ".join(recipients))
+    else:
+        outgoing.replace_header("To", ", ".join(recipients))
+
     outgoing.replace_header("Subject", f"{incoming.sender} -> {destination_distribution_list}: {incoming.subject}")
 
     print(f"Got mail \"{incoming.subject}\" from \"{incoming.sender[0]}\" ({incoming.sender[1]}); sending to {recipients}")
@@ -79,10 +88,18 @@ This will be the account/alias the the mail will be re-forwarded from
 For our usecase it's reasonable to think that only one distribution list at the time will receive messages
 """
 def getMailingList(message: ParsedMessage, distribution_list: dict) -> str:
-    for (name, addr) in message.all_recipients:
+    for (_, addr) in message.all_recipients:
         dest_address = addr.strip().lower()
         if dest_address in distribution_list:
             return dest_address
+    # Some emails can have "Undisclosed Recipients", but they apparently have this "Delivered-To"
+    #   header which contains the intended destination, so we might recur to that I guess...
+    deliverTo = message.original.get_all("Delivered-To")
+    if deliverTo is not None:
+        for address in deliverTo:
+            dest_address = address.strip().lower()
+            if dest_address in distribution_list:
+                return dest_address 
     raise ValueError('Unable to find a distribution list in the provided message and distribution list', message.all_recipients)
 
 

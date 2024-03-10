@@ -43,7 +43,7 @@ This program have some requirements:
 version: "3"
 services:
   pmr:
-    image: ghcr.io/aiforensics/protonmailrouter:0.0.9
+    image: ghcr.io/aiforensics/protonmailrouter:0.0.10
     container_name: protonmail_router
     volumes:
       - ./config.yaml:/app/config.yaml
